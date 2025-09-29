@@ -387,10 +387,10 @@ export class EventDispatcher {
                 const thisContext = this.getContext(eventToken);
                 if (thisContext.listeners.length) {
                     thisContext.listeners.push(...context.listeners);
-                    this.scheduleDispatcherRebuild(eventToken);
                 } else {
                     this.context.set(eventToken, context);
                 }
+                this.scheduleDispatcherRebuild(eventToken);
             }
         }
     }

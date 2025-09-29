@@ -255,3 +255,21 @@ test('immediatePropagationStopped', () => {
     dispatcher.dispatch(eventToken, new BaseEvent());
     expect(called).toBe(0);
 });
+
+test('mergeContextsFrom', () => {
+    const dispatcher1 = new EventDispatcher();
+    const dispatcher2 = new EventDispatcher();
+
+    const eventToken = new EventTokenSync('my-event');
+
+    let called = 0;
+
+    dispatcher1.listen(eventToken, (event) => {
+        called++;
+    });
+
+    dispatcher2.mergeContextsFrom(dispatcher1);
+
+    dispatcher2.dispatch(eventToken, new BaseEvent());
+    expect(called).toBe(1);
+})
