@@ -9,17 +9,7 @@
  */
 
 import { InjectorContext } from '@deepkit/injector';
-import {
-    rpcActionType,
-    RpcControllerAccess,
-    RpcKernel,
-    RpcKernelBaseConnection,
-    RpcKernelConnection,
-    RpcMessage,
-    RpcMessageBuilder,
-    RpcServerAction,
-    TransportConnection,
-} from '@deepkit/rpc';
+import { rpcActionType, RpcControllerAccess, RpcKernel, RpcKernelBaseConnection, RpcKernelConnection, RpcMessage, RpcMessageBuilder, RpcServerAction, TransportConnection } from '@deepkit/rpc';
 import { FrameCategory, Stopwatch } from '@deepkit/stopwatch';
 import { ClassType } from '@deepkit/core';
 import { AppModule } from '@deepkit/app';
@@ -35,7 +25,7 @@ export class RpcServerActionWithStopwatch extends RpcServerAction {
     stopwatch?: Stopwatch;
 
     protected async hasControllerAccess(controllerAccess: RpcControllerAccess, connection: RpcKernelBaseConnection): Promise<boolean> {
-        const frame = this.stopwatch ? this.stopwatch.start('RPC/controllerAccess') : undefined;
+        const frame = this.stopwatch ? this.stopwatch.start('rpc.controllerAccess') : undefined;
 
         try {
             return await super.hasControllerAccess(controllerAccess, connection);
@@ -75,7 +65,7 @@ export class RpcKernelConnectionWithStopwatch extends RpcKernelConnection {
     }
 
     protected async authenticate(message: RpcMessage, response: RpcMessageBuilder): Promise<void> {
-        const frame = this.stopwatch ? this.stopwatch.start('RPC/authenticate', FrameCategory.rpcAuthenticate, true) : undefined;
+        const frame = this.stopwatch ? this.stopwatch.start('rpc.authenticate', FrameCategory.rpcAuthenticate, true) : undefined;
         try {
             return await super.authenticate(message, response);
         } finally {

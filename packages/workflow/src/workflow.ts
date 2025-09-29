@@ -166,7 +166,7 @@ export class WorkflowDefinition<T extends WorkflowPlaces> {
                 }
             }
 
-            const stopWatchId = this.name + '/' + place;
+            const stopWatchId = this.name + '.' + place;
 
             lines.push(`
             case ${stateString}: {
