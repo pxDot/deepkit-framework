@@ -1,8 +1,10 @@
-import { Component, EventEmitter, Input, OnChanges, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, signal } from '@angular/core';
 import { defaultValue, Type, TypeArray } from '@deepkit/type';
 import { isArray } from '@deepkit/core';
-import { ButtonComponent, DialogComponent } from '@deepkit/desktop-ui';
+import { ButtonComponent, CloseDialogDirective, DialogComponent } from '@deepkit/desktop-ui';
+import { CellComponent } from '../cell/cell.component';
 import { InputEditingComponent } from './input.component';
+import { JsonPipe } from '@angular/common';
 
 @Component({
     template: `
@@ -11,14 +13,14 @@ import { InputEditingComponent } from './input.component';
           @if (model) {
             @for (item of model; track $index; let i = $index) {
               <div class="item">
-                <orm-browser-property-editing [type]="subType" [(model)]="model[i]"
-                                              (modelChange)="modelChange.emit(this.model)"></orm-browser-property-editing>
-                <dui-button icon="garbage" tight (click)="remove(i)"></dui-button>
+                <orm-browser-property-view [type]="subType" [model]="model[i]" />
+<!--                <dui-button icon="garbage" tight (click)="remove(i)"></dui-button>-->
               </div>
             }
           }
           <div class="actions">
-            <dui-button (click)="add()">Add</dui-button>
+            <dui-button closeDialog>Close</dui-button>
+<!--            <dui-button (click)="add()">Add</dui-button>-->
           </div>
         </dui-dialog>
       }
@@ -38,7 +40,7 @@ import { InputEditingComponent } from './input.component';
             margin-left: 3px;
         }
     `],
-    imports: [DialogComponent, InputEditingComponent, ButtonComponent],
+    imports: [DialogComponent, InputEditingComponent, ButtonComponent, CellComponent, JsonPipe, CloseDialogDirective],
 })
 export class ArrayInputComponent implements OnInit, OnChanges {
     @Input() model: any;
@@ -48,12 +50,18 @@ export class ArrayInputComponent implements OnInit, OnChanges {
 
     subType?: Type;
 
+    editing = signal<number | false>(false);
+
     @Output() done = new EventEmitter<void>();
     @Output() keyDown = new EventEmitter<KeyboardEvent>();
 
     ngOnChanges(): void {
         if (!isArray(this.model)) this.model = [];
         this.subType = this.type.type;
+    }
+
+    editingIndex(): number {
+        return this.editing() || 0;
     }
 
     ngOnInit(): void {
@@ -68,10 +76,16 @@ export class ArrayInputComponent implements OnInit, OnChanges {
         }
     }
 
+    addDone() {
+        this.editing.set(false);
+        this.modelChange.emit(this.model);
+    }
+
     add() {
         if (!this.subType) return;
         if (!isArray(this.model)) this.model = [];
         this.model.push(defaultValue(this.subType));
         this.modelChange.emit(this.model);
+        this.editing.set(this.model.length - 1);
     }
 }

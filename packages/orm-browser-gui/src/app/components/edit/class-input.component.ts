@@ -127,7 +127,6 @@ export class ClassInputComponent implements AfterViewInit, OnChanges, OnDestroy 
     }
 
     dialogClosed() {
-        console.log('dialogClosed', this.browserStack.length);
         this.done.emit();
         this.open = false;
     }
@@ -172,7 +171,6 @@ export class ClassInputComponent implements AfterViewInit, OnChanges, OnDestroy 
     }
 
     registerBrowser(child: ClassInputComponent) {
-        console.log('registerBrowser', this.browserStack.length);
         this.browserStack.push(child);
         this.browserStack = this.browserStack.slice();
         this.cd.detectChanges();
