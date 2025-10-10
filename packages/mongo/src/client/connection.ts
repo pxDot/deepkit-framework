@@ -265,7 +265,6 @@ export class MongoConnectionPool {
 
     protected heartbeatHost(host: Host): void {
         if (host.lastUpdatePromise) {
-            this.scopedLogger.log(`Mongo heartbeat for host ${host.id} already in progress. Try to increase heartbeatFrequency.`);
             return;
         }
 
