@@ -1,5 +1,5 @@
 import { ReceiveType, resolveReceiveType } from './reflection/reflection.js';
-import { createTypeGuardFunction, Guard, serializer, Serializer, TemplateState } from './serializer.js';
+import { createTypeGuardFunction, Guard, serializer, Serializer } from './serializer.js';
 import { NoTypeReceived } from './utils.js';
 import { ValidationError, ValidationErrorItem } from './validator.js';
 import { getTypeJitContainer } from './reflection/type.js';
@@ -31,7 +31,7 @@ export function getValidatorFunction<T>(serializerToUse: Serializer = serializer
 export function is<T>(data: any, serializerToUse: Serializer = serializer, errors: ValidationErrorItem[] = [], receiveType?: ReceiveType<T>): data is T {
     //`errors` is passed to `is` to trigger type validations as well
     const fn = getValidatorFunction(serializerToUse, receiveType);
-    return fn(data, { errors }) as boolean;
+    return fn(data, { errors });
 }
 
 export function guard<T>(serializerToUse: Serializer = serializer, receiveType?: ReceiveType<T>): Guard<T> {

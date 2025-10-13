@@ -8,23 +8,7 @@
  * You should have received a copy of the MIT License along with this program.
  */
 
-import {
-    ClassType,
-    CompilerContext,
-    CustomError,
-    getObjectKeysSize,
-    hasProperty,
-    isArray,
-    isFunction,
-    isInteger,
-    isIterable,
-    isNumeric,
-    isObject,
-    isObjectLiteral,
-    iterableSize,
-    stringifyValueWithType,
-    toFastProperties,
-} from '@deepkit/core';
+import { ClassType, CompilerContext, CustomError, getObjectKeysSize, hasProperty, isArray, isFunction, isInteger, isIterable, isNumeric, isObject, isObjectLiteral, iterableSize, stringifyValueWithType, toFastProperties } from '@deepkit/core';
 import {
     AnnotationDefinition,
     assertType,
@@ -80,15 +64,7 @@ import { resolveRuntimeType } from './reflection/processor.js';
 import { createReference, isReferenceHydrated, isReferenceInstance } from './reference.js';
 import { validate, ValidationError, ValidationErrorItem } from './validator.js';
 import { validators } from './validators.js';
-import {
-    arrayBufferToBase64,
-    base64ToArrayBuffer,
-    base64ToTypedArray,
-    typedArrayToBase64,
-    typeSettings,
-    UnpopulatedCheck,
-    unpopulatedSymbol,
-} from './core.js';
+import { arrayBufferToBase64, base64ToArrayBuffer, base64ToTypedArray, typedArrayToBase64, typeSettings, UnpopulatedCheck, unpopulatedSymbol } from './core.js';
 
 /**
  * Make sure to change the id when a custom naming strategy is implemented, since caches are based on it.
@@ -252,11 +228,13 @@ export type Guard<T> = (data: any, state?: { errors?: ValidationErrorItem[] }) =
 
 export function createTypeGuardFunction(type: Type, stateIn?: Partial<TemplateState>, serializerToUse?: Serializer, withLoose = true): undefined | Guard<any> {
     const compiler = new CompilerContext();
+    let root = true;
 
     let state: TemplateState;
     if (stateIn instanceof TemplateState) {
         state = stateIn.fork('result');
         state.compilerContext = compiler;
+        root = false;
     } else {
         state = new TemplateState('result', 'data', compiler, (serializerToUse || serializer).typeGuards.getRegistry(1));
         if (stateIn) Object.assign(state, stateIn);
@@ -273,6 +251,9 @@ export function createTypeGuardFunction(type: Type, stateIn?: Partial<TemplateSt
     //set unpopulatedCheck to ReturnSymbol to jump over those properties
     compiler.context.set('UnpopulatedCheckReturnSymbol', UnpopulatedCheck.ReturnSymbol);
 
+    // internally we operate with scores, but the outside world expects a boolean
+    const result = root ? `result > 0` : `result`;
+
     const code = `
         var result;
         if (_path === undefined) _path = '';
@@ -281,7 +262,7 @@ export function createTypeGuardFunction(type: Type, stateIn?: Partial<TemplateSt
         typeSettings.unpopulatedCheck = UnpopulatedCheckReturnSymbol;
         ${state.template}
         typeSettings.unpopulatedCheck = oldUnpopulatedCheck;
-        return result === true;
+        return ${result};
     `;
     return compiler.build(code, 'data', 'state', '_path', 'property');
 }
@@ -1422,7 +1403,11 @@ export function typeGuardObjectLiteral(type: TypeObjectLiteral | TypeClass, stat
                 if (${optionalCheck} ${propertyAccessor} !== unpopulatedSymbol) {
                     let ${checkValid} = false;
                     ${checkTemplate || `// no template found for member ${String(member.name)}.type.kind=${forType.kind}`}
-                    if (!${checkValid}) ${state.setter} = false;
+                    if (${checkValid}) {
+                        matching++;
+                    } else {
+                        ${state.setter} = false;
+                    }
                 }`);
             }
         }
@@ -1441,7 +1426,11 @@ export function typeGuardObjectLiteral(type: TypeObjectLiteral | TypeClass, stat
             signatureLines.push(`else if (${getIndexCheck(state.compilerContext, i, signature.index)}) {
                 let ${checkValid} = false;
                 ${checkTemplate || `// no template found for signature.type.kind=${signature.type.kind}`}
-                if (!${checkValid}) ${state.setter} = false;
+                if (${checkValid}) {
+                    matching++;
+                } else {
+                    ${state.setter} = false;
+                }
             }`);
         }
 
@@ -1481,6 +1470,8 @@ export function typeGuardObjectLiteral(type: TypeObjectLiteral | TypeClass, stat
     state.setContext({ isObjectLiteral });
 
     state.addCodeForSetter(`
+    {
+        let matching = 0;
         ${state.setter} = true;
         if (${state.accessor} && isObjectLiteral(${state.accessor})) {
             ${lines.join('\n')}
@@ -1489,6 +1480,10 @@ export function typeGuardObjectLiteral(type: TypeObjectLiteral | TypeClass, stat
             if (${state.isValidation()}) ${state.assignValidationError('type', 'Not an object')}
             ${state.setter} = false;
         }
+        if (${state.setter}) {
+            ${state.setter} = matching || 1;
+        }
+    }
     `);
 }
 
@@ -1716,7 +1711,7 @@ export function serializePropertyOrParameter(type: TypePropertySignature | TypeP
 }
 
 export function validatePropertyOrParameter(type: TypePropertySignature | TypeProperty | TypeParameter, state: TemplateState) {
-    const optional = isOptional(type)
+    const optional = isOptional(type);
     const hasDefault = hasDefaultValue(type);
 
     state.addCode(`
@@ -1728,7 +1723,7 @@ export function validatePropertyOrParameter(type: TypePropertySignature | TypePr
     `);
 }
 
-export function handleUnion(type: TypeUnion, state: TemplateState) {
+export function handleUnion(type: TypeUnion, state: TemplateState, typeGuards?: TypeGuardRegistry) {
     //detecting which serializer to use in union is a complex topic and allows a key feature: deserializing an encoding that is entirely based on strings (e.g. URL query string)
     //to support for example numeric string, we need to have multiple guards being able to detect their 'loosely type' equivalence, for example
     // - '1234' => number
@@ -1764,23 +1759,27 @@ export function handleUnion(type: TypeUnion, state: TemplateState) {
 
     //anything below 0 is a loose guard, for example a numeric string, or numbers as boolean. guards below 0 are only used when enabled manually.
     //guards between 0 and 1 are standard loose types that are necessary to support JSON, e.g. '2021-11-24T16:21:13.425Z' => Date.
-    const lines: string[] = [];
+    const linesPrimitives: string[] = [];
+    const linesPrimitivesAlternatives: string[] = [];
+    const linesObjects: string[] = [];
+    const actions: string[] = [];
 
     //since there are type guards that require to access the container (for example Embedded), its necessary to pass the container (if available) to the type guard function
     //and change accessor to point to `data` (argument of the type guard) + index name.
     const property = state.accessor instanceof ContainerAccessor ? `${state.accessor.property}` : 'undefined';
-    const args = `${state.accessor instanceof ContainerAccessor ? state.accessor.container : state.accessor}, state, ${collapsePath(state.path)}, ${property}`;
+    const args = `${(state.accessor instanceof ContainerAccessor ? state.accessor.container : state.accessor) || 'undefined'}, state, ${collapsePath(state.path)}, ${property}`;
     const accessor = state.accessor instanceof ContainerAccessor ? new ContainerAccessor('data', 'property') : 'data';
 
-    const typeGuards = state.registry.serializer.typeGuards.getSortedTemplateRegistries();
+    typeGuards ||= state.registry.serializer.typeGuards;
+    const sortedTypeGuards = typeGuards.getSortedTemplateRegistries();
 
-    for (const [specificality, typeGuard] of typeGuards) {
+    for (const [specificality, typeGuard] of sortedTypeGuards) {
         //loosely type guards are only used for deserialization
         if (state.target === 'serialize' && specificality < 1) continue;
 
         //when validation=true and not all specificalities are included, we only use 1, which is used for strict validation()/is().
         if (state.validation === 'strict' && specificality !== 1) continue;
-        const validation = !state.validation ? 'loose' : state.validation;
+        const validation = !state.validation ? state.target === 'serialize' ? 'strict' : 'loose' : state.validation;
 
         for (const t of type.types) {
             const fn = createTypeGuardFunction(
@@ -1790,18 +1789,36 @@ export function handleUnion(type: TypeUnion, state: TemplateState) {
                     //if validation is not set, we are in deserialize mode, so we need to activate validation
                     //for this state.
                     .withValidation(validation)
-                    .includeAllSpecificalities(state.registry.serializer.typeGuards),
+                    .includeAllSpecificalities(typeGuards),
                 undefined, false,
             );
             if (!fn) continue;
             const guard = state.setVariable('guard_' + ReflectionKind[t.kind], fn);
             const looseCheck = specificality <= 0 ? `state.loosely !== false && ` : '';
+            const isAlternativeCheck = specificality > 1;
+            const debug = `type = ${ReflectionKind[t.kind]} ${t.typeName}, specificality=${specificality}`
 
             const action = state.isValidation() ? `${state.setter} = true;` : executeTemplates(state.fullFork(), t);
-            lines.push(`else if (${looseCheck}${guard}(${args})) {
-                //type = ${ReflectionKind[t.kind]}, specificality=${specificality}
-                ${action}
-            }`);
+
+            if (isCustomTypeClass(t) || t.kind === ReflectionKind.objectLiteral) {
+                const maxScore = t.types.length;
+                actions.push(action);
+                linesObjects.push(`
+                //${debug}
+                if (${looseCheck} ${maxScore} > matching) {
+                    const score = ${guard}(${args});
+                    if (score > matching) {
+                        matching = score;
+                        matchingIndex = ${actions.length - 1};
+                    }
+                }`);
+            } else {
+                (isAlternativeCheck ? linesPrimitivesAlternatives : linesPrimitives).push(`
+                //${debug}
+                else if (${looseCheck} ${guard}(${args})) {
+                   ${action}
+                }`);
+            }
         }
     }
 
@@ -1818,11 +1835,26 @@ export function handleUnion(type: TypeUnion, state: TemplateState) {
             if (state.errors) state.errors = [];
 
             //type guard for union
-            if (false) {} ${lines.join(' ')}
+            if (false) {}
+            ${linesPrimitives.join(' ')}
             else {
-                ${handleErrors}
-                ${state.assignValidationError('type', 'No valid union member found. Valid: ' + stringifyResolvedType(type))}
+                let matchingIndex = -1;
+                let matching = 0;
+                ${linesObjects.join(' ')}
+
+                switch (matchingIndex) {
+                    ${actions.map((v, i) => `case ${i}: {${v} break;}`).join('\n')}
+                    default: {
+                        if (false) {}
+                        ${linesPrimitivesAlternatives.join(' ')}
+                        else {
+                            ${handleErrors}
+                            ${state.assignValidationError('type', 'No valid union member found. Valid: ' + stringifyResolvedType(type))}
+                        }
+                    }
+                }
             }
+
             state.errors = oldErrors;
         }
     `);

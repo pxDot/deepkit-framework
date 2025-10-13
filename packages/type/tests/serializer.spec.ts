@@ -1390,3 +1390,37 @@ test('skip parameter name resolving', () => {
 
     expect(cast<Vehicle>({ Guest: { id: '1' } })).toEqual(new Vehicle(new Guest(1)));
 });
+
+test('union with almost same member, additional properties', () => {
+    type T = { a: string } | { a: string, b: number };
+    const t1 = cast<T>({ a: '3' });
+    expect(t1).toEqual({ a: '3' });
+    const t2 = cast<T>({ a: '3', b: '4' });
+    expect(t2).toEqual({ a: '3', b: 4 });
+});
+
+test('union with almost same member, optional properties', () => {
+    type T = { a: string; c?: number } | { a: string, b?: number };
+    const t1 = cast<T>({ a: '3' });
+    expect(t1).toEqual({ a: '3' });
+    const t2 = cast<T>({ a: '3', b: 4 });
+    expect(t2).toEqual({ a: '3', b: 4 });
+});
+
+test('union with less specific last', () => {
+    type T = { a: string; c?: number } | { a: string };
+    const t1 = cast<T>({ a: '3' });
+    expect(t1).toEqual({ a: '3' });
+    const t2 = cast<T>({ a: '3', c: 4 });
+    expect(t2).toEqual({ a: '3', c: 4 });
+});
+
+test('union same member, optional', () => {
+    type T = { a: number, b?: number } | { a: number; b: string; };
+    const t1 = serialize<T>({ a: 3 });
+    expect(t1).toEqual({ a: 3 });
+    const t2 = serialize<T>({ a: 3, b: '4' });
+    expect(t2).toEqual({ a: 3, b: '4' });
+    const t3 = serialize<T>({ a: 3, b: 4 });
+    expect(t3).toEqual({ a: 3, b: 4 });
+});

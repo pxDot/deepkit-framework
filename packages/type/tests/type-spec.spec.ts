@@ -893,9 +893,9 @@ test('union with optional fields', () => {
         __kind!: 'Bar';
     }
 
-    expect(deserializeFromJson<Bar | Foo>({__kind: 'Bar'})).toEqual({__kind: 'Bar'});
-    expect(deserializeFromJson<Bar | Foo>({__kind: 'Foo', a: 'a'})).toEqual({__kind: 'Foo', a: 'a'});
-    expect(deserializeFromJson<Bar | Foo>({__kind: 'Foo'})).toEqual({__kind: 'Foo'});
+    expect(deserializeFromJson<Bar | Foo>({ __kind: 'Bar' })).toEqual({ __kind: 'Bar' });
+    expect(deserializeFromJson<Bar | Foo>({ __kind: 'Foo', a: 'a' })).toEqual({ __kind: 'Foo', a: 'a' });
+    expect(deserializeFromJson<Bar | Foo>({ __kind: 'Foo' })).toEqual({ __kind: 'Foo' });
 });
 
 test('union with default fields', () => {
@@ -910,7 +910,15 @@ test('union with default fields', () => {
 
     type t = Bar | Foo;
 
-    expect(deserializeFromJson<t>({__kind: 'Bar'})).toEqual({__kind: 'Bar'});
-    expect(deserializeFromJson<t>({__kind: 'Foo', a: 'b'})).toEqual({__kind: 'Foo', a: 'b'});
-    expect(deserializeFromJson<t>({__kind: 'Foo'})).toEqual({__kind: 'Foo', a: 'a'});
+    expect(deserializeFromJson<t>({ __kind: 'Bar' })).toEqual({ __kind: 'Bar' });
+    expect(deserializeFromJson<t>({ __kind: 'Foo', a: 'b' })).toEqual({ __kind: 'Foo', a: 'b' });
+    expect(deserializeFromJson<t>({ __kind: 'Foo' })).toEqual({ __kind: 'Foo', a: 'a' });
+});
+
+test('union with almost same member, optional properties', () => {
+    type T = { a: string, c: number | undefined } | { a: string, b: number | undefined } | { a: string };
+    const json1 = serializeToJson<T>({ a: 'a' });
+    expect(json1).toEqual({ a: 'a' });
+    const json2 = serializeToJson<T>({ a: 'a', b: 2 });
+    expect(json2).toEqual({ a: 'a', b: 2 });
 });

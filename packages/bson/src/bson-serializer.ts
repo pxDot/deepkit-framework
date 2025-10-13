@@ -73,7 +73,6 @@ import {
     bsonTypeGuardObjectLiteral,
     bsonTypeGuardTemplateLiteral,
     bsonTypeGuardTuple,
-    bsonTypeGuardUnion,
     deserializeAny,
     deserializeArray,
     deserializeBigInt,
@@ -1417,7 +1416,7 @@ export class BSONBinarySerializer extends Serializer {
         this.bsonTypeGuards.register(1, ReflectionKind.templateLiteral, bsonTypeGuardTemplateLiteral);
         this.bsonTypeGuards.register(1, ReflectionKind.regexp, bsonTypeGuardForBsonTypes([BSONType.REGEXP]));
 
-        this.bsonTypeGuards.register(1, ReflectionKind.union, (type, state) => bsonTypeGuardUnion(this.bsonTypeGuards, type, state));
+        this.bsonTypeGuards.register(1, ReflectionKind.union, (type, state) => deserializeUnion(this.bsonTypeGuards, type, state));
         this.bsonTypeGuards.register(1, ReflectionKind.array, bsonTypeGuardArray);
         this.bsonTypeGuards.register(1, ReflectionKind.tuple, bsonTypeGuardTuple);
         this.bsonTypeGuards.register(1, ReflectionKind.promise, (type, state) => executeTemplates(state, type.type));
@@ -1549,7 +1548,7 @@ export function createBSONSizer<T>(type?: ReceiveType<T>, serializer: BSONBinary
     const state = new TemplateState('', 'data', compiler, serializer.sizerRegistry, new NamingStrategy(), jitStack, []).disableSetter();
 
     const code = `
-        state = state || {};
+        state = state || {loosely: false};
         state.size = 0;
 
         const unpopulatedCheck = typeSettings.unpopulatedCheck;
