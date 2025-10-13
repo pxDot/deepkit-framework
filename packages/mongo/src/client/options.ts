@@ -215,4 +215,5 @@ export interface CommandOptions {
 
     hint?: HintMessage;
     collation?: CollationMessage;
+    estimateCount?: boolean;
 }
