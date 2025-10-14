@@ -21,7 +21,7 @@ import { convertClassQueryToMongo } from './mapping.js';
 import { DEEP_SORT, FilterQuery, MongoQueryModel } from './query.model.js';
 import { MongoConnection } from './client/connection.js';
 import { MongoDatabaseAdapter, MongoExplainVerbosity } from './adapter.js';
-import { formatError } from '@deepkit/core';
+import { empty, formatError } from '@deepkit/core';
 import { mongoSerializer } from './mongo-serializer.js';
 import { handleSpecificError } from './error.js';
 import { ExplainCommand, MongoExplain } from './client/command/explain.js';
@@ -240,6 +240,12 @@ export class MongoQueryResolver<T extends OrmEntity> extends GenericQueryResolve
         }
 
         const query = getMongoFilter(this.classSchema, queryModel);
+        if (!queryModel.getCommandOptions().estimateCount && empty(query)) {
+            //when a query is empty, mongo returns an estimated count from meta-data.
+            //we don't want estimates, we want deterministic results, so we add a query
+            const primaryKey = this.classSchema.getPrimary().name;
+            query[primaryKey] = { $nin: [] };
+        }
         const command = new CountCommand(
             this.classSchema,
             query,

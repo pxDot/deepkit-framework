@@ -602,11 +602,11 @@ test('nullable container', () => {
 });
 
 test('nullable basics', () => {
-    expect(roundTrip<string | null>(undefined)).toBe(null);
     expect(roundTrip<string | null>(null)).toBe(null);
+    expect(roundTrip<string | null>(undefined)).toBe(null);
 
-    expect(roundTrip<number | null>(undefined)).toBe(null);
     expect(roundTrip<number | null>(null)).toBe(null);
+    expect(roundTrip<number | null>(undefined)).toBe(null);
 
     expect(roundTrip<boolean | null>(undefined)).toBe(null);
     expect(roundTrip<boolean | null>(null)).toBe(null);

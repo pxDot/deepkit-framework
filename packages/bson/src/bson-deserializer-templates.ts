@@ -14,6 +14,7 @@ import {
     getNameExpression,
     getStaticDefaultCodeForProperty,
     hasDefaultValue,
+    isCustomTypeClass,
     isNullable,
     isOptional,
     isPropertyMemberType,
@@ -264,34 +265,86 @@ export function deserializeRegExp(type: Type, state: TemplateState) {
     `);
 }
 
-export function deserializeUnion(bsonTypeGuards: TypeGuardRegistry, type: TypeUnion, state: TemplateState) {
-    const lines: string[] = [];
+export function deserializeUnion(typeGuards: TypeGuardRegistry, type: TypeUnion, state: TemplateState) {
+    const linesPrimitives: string[] = [];
+    const linesPrimitivesAlternatives: string[] = [];
+    const linesObjects: string[] = [];
+    const actions: string[] = [];
 
     //see handleUnion from deepkit/type for more information
-    const typeGuards = bsonTypeGuards.getSortedTemplateRegistries();
+    const sortedTypeGuards = typeGuards.getSortedTemplateRegistries();
 
-    for (const [specificality, typeGuard] of typeGuards) {
+    for (const [specificality, typeGuard] of sortedTypeGuards) {
         for (const t of type.types) {
-            const fn = createTypeGuardFunction(t, state.fork().forRegistry(typeGuard));
+            if (state.target === 'serialize' && specificality < 1) continue;
+            if (state.validation === 'strict' && specificality !== 1) continue;
+
+            const validation = !state.validation ? 'loose' : state.validation;
+
+            const fn = createTypeGuardFunction(t,
+                state.fork()
+                    .forRegistry(typeGuard)
+                    .withValidation(validation),
+            );
             if (!fn) continue;
             const guard = state.setVariable('guard' + t.kind, fn);
             const looseCheck = specificality <= 0 ? `state.loosely && ` : '';
+            const isAlternativeCheck = specificality > 1;
 
-            lines.push(`else if (${looseCheck}${guard}(${state.accessor || 'undefined'}, state, ${collapsePath(state.path)})) { //type = ${t.kind}, specificality=${specificality}
-                ${executeTemplates(state.fork(state.setter, state.accessor).forPropertyName(state.propertyName), t)}
-            }`);
+            const args = state.isValidation() ? `${state.accessor || 'undefined'}, state` : `${state.accessor || 'undefined'}, state, ${collapsePath(state.path)}`;
+            const action = state.isValidation() ? `${state.setter} = true;` : executeTemplates(state.fork(state.setter, state.accessor).forPropertyName(state.propertyName), t);
+
+            const debug = `type = ${ReflectionKind[t.kind]} ${t.typeName}, specificality=${specificality}, validation=${state.isValidation()}, ${String(state.propertyName)}`;
+            if (isCustomTypeClass(t) || t.kind === ReflectionKind.objectLiteral) {
+                const maxScore = t.types.length;
+                actions.push(action);
+                linesObjects.push(`
+                //${debug}
+                if (${looseCheck} ${maxScore} > matching) {
+                    const score = ${guard}(${args});
+                    if (score > matching) {
+                        matching = score;
+                        matchingIndex = ${actions.length - 1};
+                    }
+                }`);
+            } else {
+                (isAlternativeCheck ? linesPrimitivesAlternatives : linesPrimitives).push(`
+                 //${debug}
+                else if (${looseCheck}${guard}(${args})) {
+                   ${action}
+                }`);
+            }
         }
     }
+
+    const init = state.isValidation() ? `${state.setter} = false;` : '';
+    const invalidValue = state.isValidation() ? '' : `${throwInvalidBsonType(type, state)}`;
 
     state.addCodeForSetter(`
     {
         // deserializeUnion
         if (!state.elementType) state.elementType = ${BSONType.OBJECT};
         const oldElementType = state.elementType;
-        if (false) {
-        } ${lines.join(' ')}
+        ${init}
+     
+        //validation=${state.isValidation()}, path=${collapsePath(state.path)}
+        if (false) {}
+        ${linesPrimitives.join(' ')}
         else {
-            ${throwInvalidBsonType(type, state)}
+            let matchingIndex = -1;
+            let matching = 0;
+            ${linesObjects.join(' ')}
+
+            switch (matchingIndex) {
+                ${actions.map((v, i) => `case ${i}: {${v} break;}`).join('\n')}
+                default: {
+                    if (false) {}
+                    ${linesPrimitivesAlternatives.join(' ')}
+                    else {
+                        ${invalidValue}
+                    }
+                }
+            }
         }
 
         state.elementType = oldElementType;
@@ -312,7 +365,7 @@ export function bsonTypeGuardUnion(bsonTypeGuards: TypeGuardRegistry, type: Type
             const guard = state.setVariable('guard' + t.kind, fn);
             const looseCheck = specificality <= 0 ? `state.loosely && ` : '';
 
-            lines.push(`else if (${looseCheck}${guard}(${state.accessor || 'undefined'}, state)) { //type = ${t.kind}, specificality=${specificality}
+            lines.push(`else if (${looseCheck}${guard}(${state.accessor || 'undefined'}, state)) { //type = ${t.kind} ${t.typeName}, specificality=${specificality}
                 ${state.setter} = true;
             }`);
         }
@@ -933,7 +986,11 @@ export function bsonTypeGuardObjectLiteral(type: TypeClass | TypeObjectLiteral, 
                 ${seekOnExplicitUndefined}
                 ${template}
 
-                if (!${valid}) break;
+                if (${valid}) {
+                    matching++;
+                } else {
+                    break;
+                }
                 //guards never eat/parse parser, so we jump over the value automatically
                 seekElementSize(elementType, state.parser);
                 continue;
@@ -950,8 +1007,11 @@ export function bsonTypeGuardObjectLiteral(type: TypeClass | TypeObjectLiteral, 
         for (const signature of signatures) {
             signatureLines.push(`else if (${getIndexCheck(state.compilerContext, i, signature.index)}) {
                 ${executeTemplates(state.fork(valid).extendPath(new RuntimeCode(i)).forPropertyName(new RuntimeCode(i)), signature.type)}
-
-                if (!${valid}) break;
+                if (${valid}) {
+                    matching++;
+                } else {
+                    break;
+                }
                 //guards never eat/parse parser, so we jump over the value automatically
                 seekElementSize(elementType, state.parser);
                 continue;
@@ -976,6 +1036,7 @@ export function bsonTypeGuardObjectLiteral(type: TypeClass | TypeObjectLiteral, 
         ${state.setter} = state.elementType && state.elementType === ${BSONType.OBJECT};
         if (${state.setter}) {
             let ${valid} = true;
+            let matching = 0;
             const start = state.parser.offset;
             const end = state.parser.eatUInt32() + state.parser.offset;
 
@@ -1001,7 +1062,11 @@ export function bsonTypeGuardObjectLiteral(type: TypeClass | TypeObjectLiteral, 
             state.elementType = oldElementType;
             state.parser.offset = start;
 
-            ${state.setter} = ${valid};
+            if (${valid}) {
+                ${state.setter} = matching || 1;
+            } else {
+                ${state.setter} = 0;
+            }
         }
     `);
 }

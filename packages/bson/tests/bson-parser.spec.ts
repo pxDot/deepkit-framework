@@ -1,22 +1,7 @@
 import { expect, test } from '@jest/globals';
 import bson, { Binary } from 'bson';
 import { deserializeBSON, getBSONDeserializer } from '../src/bson-deserializer.js';
-import {
-    BinaryBigInt,
-    copyAndSetParent,
-    MinLength,
-    MongoId,
-    nodeBufferToArrayBuffer,
-    PrimaryKey,
-    Reference,
-    ReflectionKind,
-    SerializedTypes,
-    SignedBinaryBigInt,
-    TypeObjectLiteral,
-    typeOf,
-    uuid,
-    UUID,
-} from '@deepkit/type';
+import { BinaryBigInt, copyAndSetParent, MinLength, MongoId, nodeBufferToArrayBuffer, PrimaryKey, Reference, ReflectionKind, SerializedTypes, SignedBinaryBigInt, TypeObjectLiteral, typeOf, uuid, UUID } from '@deepkit/type';
 import { getClassName } from '@deepkit/core';
 import { getBSONSerializer, serializeBSON, serializeBSONWithoutOptimiser } from '../src/bson-serializer.js';
 import { BSONType } from '../src/utils';
@@ -830,6 +815,40 @@ test('complex union', () => {
     });
 });
 
+test('serialize types', () => {
+    const serialize = getBSONSerializer<SerializedTypes>();
+    const deserialize = getBSONDeserializer<SerializedTypes>();
+
+    {
+        const bson = serialize([{ kind: ReflectionKind.string }]);
+        const back = deserialize(bson);
+        expect(back).toEqual([{ kind: ReflectionKind.string }]);
+    }
+    {
+        const bson = serialize([
+            {
+                kind: ReflectionKind.objectLiteral,
+                types: [1, 2],
+            },
+            { kind: ReflectionKind.propertySignature, name: 'a', type: 3 },
+            { kind: ReflectionKind.propertySignature, name: 'b', type: 4 },
+            { kind: ReflectionKind.string },
+            { kind: ReflectionKind.number },
+        ]);
+        const back = deserialize(bson);
+        expect(back).toEqual([
+            {
+                kind: ReflectionKind.objectLiteral,
+                types: [1, 2],
+            },
+            { kind: ReflectionKind.propertySignature, name: 'a', type: 3 },
+            { kind: ReflectionKind.propertySignature, name: 'b', type: 4 },
+            { kind: ReflectionKind.string },
+            { kind: ReflectionKind.number },
+        ]);
+    }
+});
+
 test('Encoder', () => {
     {
         type T = string;
@@ -878,4 +897,35 @@ test('createParserLookup from invalid object', () => {
     expect(deserializeBSON<{ v: number }>(bson).v).toEqual(0);
     expect(deserializeBSON<{ v: bigint }>(bson).v).toEqual(BigInt(0));
     expect(deserializeBSON<{ v: boolean }>(bson).v).toEqual(false);
+});
+
+test('union almost same member', () => {
+    type T = { a: number } | { a: number; b: string; };
+    const serialize = getBSONSerializer<T>();
+    const deserialize = getBSONDeserializer<T>();
+    const data1: T = { a: 1 };
+    expect(deserialize(serialize(data1))).toEqual(data1);
+    const data2: T = { a: 1, b: '2' };
+    const bson2 = serialize(data2);
+    expect(deserializeBSONWithoutOptimiser(bson2)).toEqual(data2);
+    const back2 = deserialize(bson2);
+    expect(back2).toEqual(data2);
+});
+
+test('union same member, optional', () => {
+    type T = { a: number, b?: number } | { a: number; b: string; };
+    const serialize = getBSONSerializer<T>();
+    const deserialize = getBSONDeserializer<T>();
+    const data1: T = { a: 1 };
+    expect(deserialize(serialize(data1))).toEqual(data1);
+    const data2: T = { a: 1, b: 3 };
+    const bson2 = serialize(data2);
+    expect(deserializeBSONWithoutOptimiser(bson2)).toEqual(data2);
+    const back2 = deserialize(bson2);
+    expect(back2).toEqual(data2);
+    const data3: T = { a: 1, b: '2' };
+    const bson3 = serialize(data3);
+    expect(deserializeBSONWithoutOptimiser(bson3)).toEqual(data3);
+    const back3 = deserialize(bson3);
+    expect(back3).toEqual(data3);
 });
