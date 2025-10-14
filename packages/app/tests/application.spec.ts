@@ -53,6 +53,24 @@ test('loadConfigFromEnvVariables', async () => {
     expect(baseService.db).toBe('changed2');
 });
 
+test('loadConfigFromEnvVariables upper same', async () => {
+    process.env.CC_PREVIEW_INTERNAL_KEY = 'abced';
+    class Config {
+        PREVIEW_INTERNAL_KEY: string = 'default';
+    }
+
+    class Service {
+        constructor(public key: Config['PREVIEW_INTERNAL_KEY']) {
+        }
+    }
+
+    const app = new App({ config: Config, providers: [Service] });
+    app.loadConfigFromEnv({ prefix: 'CC_', namingStrategy: 'upper' });
+
+    const service = app.get(Service);
+    expect(service.key).toBe('abced');
+});
+
 test('loadConfigFromEnvFile', async () => {
     const app = new App({ config: Config, providers: [Service], imports: [new BaseModule] });
     app.loadConfigFromEnv({ envFilePath: dirname + '/test.env' });

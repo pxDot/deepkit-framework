@@ -41,11 +41,17 @@ type EnvNamingStrategy =
     | ((name: string) => string | 'same' | 'upper' | 'lower' | undefined);
 
 function camelToUpperCase(str: string) {
-    return str.replace(/[A-Z]+/g, (letter: string) => `_${letter.toUpperCase()}`).toUpperCase();
+    if (/^[A-Z0-9_]+$/.test(str)) return str; // already upper snake case
+    return str
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2') // insert underscore between lower/number and upper
+        .toUpperCase();
 }
 
 function camelToLowerCase(str: string) {
-    return str.replace(/[A-Z]+/g, (letter: string) => `_${letter.toLowerCase()}`).toLowerCase();
+    if (/^[a-z0-9_]+$/.test(str)) return str; // already lower snake case
+    return str
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2') // insert underscore
+        .toLowerCase();
 }
 
 function convertNameStrategy(namingStrategy: EnvNamingStrategy, name: string): string {
