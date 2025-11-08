@@ -166,6 +166,10 @@ function getSignedBinaryBigIntSize(value: bigint): number {
 
 export function getValueSize(value: any): number {
     if (value instanceof ValueWithBSONSerializer) {
+        if (value.value === undefined || value.value === null) {
+            return 0;
+        }
+
         if (isUUIDType(value.type)) {
             return 4 + 1 + 16;
         } else if (isMongoIdType(value.type)) {
@@ -173,9 +177,8 @@ export function getValueSize(value: any): number {
         } else if (isBinaryBigIntType(value.type)) {
             const binaryBigInt = binaryBigIntAnnotation.getFirst(value.type)!;
             return binaryBigInt === BinaryBigIntType.unsigned ? getBinaryBigIntSize(value.value) : getSignedBinaryBigIntSize(value.value);
-        } else {
-            return getValueSize(value.value);
         }
+        return getValueSize(value.value);
     } else if ('boolean' === typeof value) {
         return 1;
     } else if ('string' === typeof value) {
@@ -553,6 +556,24 @@ export class Writer {
     }
 
     writeObjectId(value: string) {
+        if (!value) {
+            // set all to zero
+            this.buffer[this.offset + 0] = 0;
+            this.buffer[this.offset + 1] = 0;
+            this.buffer[this.offset + 2] = 0;
+            this.buffer[this.offset + 3] = 0;
+            this.buffer[this.offset + 4] = 0;
+            this.buffer[this.offset + 5] = 0;
+            this.buffer[this.offset + 6] = 0;
+            this.buffer[this.offset + 7] = 0;
+            this.buffer[this.offset + 8] = 0;
+            this.buffer[this.offset + 9] = 0;
+            this.buffer[this.offset + 10] = 0;
+            this.buffer[this.offset + 11] = 0;
+            this.offset += 12;
+            return;
+        }
+
         this.buffer[this.offset + 0] = hexToByte(value, 0);
         this.buffer[this.offset + 1] = hexToByte(value, 1);
         this.buffer[this.offset + 2] = hexToByte(value, 2);
@@ -570,25 +591,28 @@ export class Writer {
 
     write(value: any): void {
         if (value instanceof ValueWithBSONSerializer) {
-            if (value.value !== undefined && value.value !== null) {
-                if (isUUIDType(value.type)) {
-                    this.writeType(BSONType.BINARY);
-                    this.writeUUID(value.value);
-                    return;
-                } else if (isMongoIdType(value.type)) {
-                    this.writeType(BSONType.OID);
-                    this.writeObjectId(value.value);
-                    return;
-                } else if (isBinaryBigIntType(value.type)) {
-                    this.writeType(BSONType.BINARY);
-                    const binary = binaryBigIntAnnotation.getFirst(value.type)!;
-                    if (binary === BinaryBigIntType.signed) {
-                        this.writeSignedBigIntBinary(value.value);
-                    } else {
-                        this.writeBigIntBinary(value.value);
-                    }
-                    return;
+            if (value.value === undefined || value.value === null) {
+                this.writeType(BSONType.NULL);
+                return;
+            }
+
+            if (isUUIDType(value.type)) {
+                this.writeType(BSONType.BINARY);
+                this.writeUUID(value.value);
+                return;
+            } else if (isMongoIdType(value.type)) {
+                this.writeType(BSONType.OID);
+                this.writeObjectId(value.value);
+                return;
+            } else if (isBinaryBigIntType(value.type)) {
+                this.writeType(BSONType.BINARY);
+                const binary = binaryBigIntAnnotation.getFirst(value.type)!;
+                if (binary === BinaryBigIntType.signed) {
+                    this.writeSignedBigIntBinary(value.value);
+                } else {
+                    this.writeBigIntBinary(value.value);
                 }
+                return;
             }
             this.write(value.value);
         } else if ('boolean' === typeof value) {

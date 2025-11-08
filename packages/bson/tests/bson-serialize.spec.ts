@@ -1,30 +1,6 @@
 import { expect, test } from '@jest/globals';
-import {
-    AutoBuffer,
-    getBSONSerializer,
-    getBSONSizer,
-    getValueSize,
-    hexToByte,
-    serializeBSONWithoutOptimiser,
-    uuidStringToByte,
-    wrapObjectId,
-    wrapUUID,
-    wrapValue,
-} from '../src/bson-serializer.js';
-import {
-    BinaryBigInt,
-    createReference,
-    Excluded,
-    hasCircularReference,
-    MongoId,
-    nodeBufferToArrayBuffer,
-    PrimaryKey,
-    Reference,
-    SignedBinaryBigInt,
-    typeOf,
-    uuid,
-    UUID,
-} from '@deepkit/type';
+import { AutoBuffer, getBSONSerializer, getBSONSizer, getValueSize, hexToByte, serializeBSONWithoutOptimiser, uuidStringToByte, wrapObjectId, wrapUUID, wrapValue } from '../src/bson-serializer.js';
+import { BinaryBigInt, createReference, Excluded, hasCircularReference, MongoId, nodeBufferToArrayBuffer, PrimaryKey, Reference, SignedBinaryBigInt, typeOf, uuid, UUID } from '@deepkit/type';
 import bson from 'bson';
 import { randomBytes } from 'crypto';
 import { BSON_BINARY_SUBTYPE_DEFAULT, BSONType } from '../src/utils.js';
@@ -1669,4 +1645,12 @@ test('string fallback from number', () => {
         const back2 = getBSONDeserializer<T>()(bson);
         expect(back2.v).toEqual(['1', '2']);
     }
+});
+
+test('optional MongoId in object', () => {
+    type T = { v: any };
+    const serialize = getBSONSerializer<T>();
+    const bson = serialize({ v: wrapObjectId(undefined as any) });
+    const back = getBSONDeserializer<T>()(bson);
+    expect(back.v).toBeUndefined();
 });

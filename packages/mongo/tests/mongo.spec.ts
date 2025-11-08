@@ -1,26 +1,11 @@
 import { expect, jest, test } from '@jest/globals';
-import {
-    arrayBufferFrom,
-    AutoIncrement,
-    BackReference,
-    cast,
-    entity,
-    MongoId,
-    nodeBufferToArrayBuffer,
-    PrimaryKey,
-    Reference,
-    ReflectionClass,
-    ReflectionKind,
-    serialize,
-    Unique,
-    UUID,
-    uuid,
-} from '@deepkit/type';
+import { arrayBufferFrom, AutoIncrement, BackReference, cast, entity, MongoId, nodeBufferToArrayBuffer, PrimaryKey, Reference, ReflectionClass, ReflectionKind, serialize, Unique, UUID, uuid } from '@deepkit/type';
 import { Database, getInstanceStateFromItem, UniqueConstraintFailure } from '@deepkit/orm';
 import { SimpleModel, SuperSimple } from './entities.js';
 import { createDatabase } from './utils.js';
 import { MongoDatabaseAdapter } from '../src/adapter.js';
 import { MemoryLogger } from '@deepkit/logger';
+import { ObjectId } from '@deepkit/bson';
 
 Error.stackTraceLimit = 100;
 jest.setTimeout(10000);
@@ -837,4 +822,40 @@ test('allowDiskUse', async () => {
         expect(users).toEqual([{ name: 'eclair' }]);
     }
     database.disconnect();
+});
+
+test('non-optional MongoId', async () => {
+    class Model {
+        _id: MongoId & PrimaryKey = '';
+
+        constructor(public teamId: MongoId) {
+
+        }
+    }
+
+    const database = await createDatabase('non-optional-mongo-id');
+
+    const model1 = new Model(ObjectId.generate());
+    await database.persist(model1);
+
+    const items1 = await database.query(Model)
+        .filter({ teamId: undefined })
+        .find();
+    expect(items1.length).toBe(0);
+
+    const items2 = await database.query(Model)
+        .filter({ teamId: null as any })
+        .find();
+    expect(items2.length).toBe(0);
+
+    const items3 = await database.query(Model)
+        .filter({ teamId: '' })
+        .find();
+    expect(items3.length).toBe(0);
+
+    const items4 = await database.query(Model)
+        .filter({ teamId: model1.teamId })
+        .find();
+    expect(items4.length).toBe(1);
+    expect(items4[0]).toBeInstanceOf(Model);
 });
