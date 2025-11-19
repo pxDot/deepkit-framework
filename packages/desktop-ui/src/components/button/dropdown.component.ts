@@ -357,7 +357,8 @@ export class DropdownComponent implements OnChanges, OnDestroy, AfterViewInit {
 
         this.lastFocusWatcher?.();
         if (target instanceof Element) {
-            if (!this.positionObserver) {
+            if (!this.positionObserver || this.openForElement !== target) {
+                this.positionObserver?.();
                 this.positionObserver = observePosition(target, () => {
                     overlayRef?.updatePosition();
                 });
