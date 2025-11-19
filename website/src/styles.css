@@ -531,14 +531,14 @@ pre.console {
 
 html body .normalize-text.dark {
   --color-header: white;
-  --color-text: #ccc;
+  --color-text: #dddddd;
   --color-text-selection-bg: #0062b6;
   --color-text-selection: white;
   --context-text-color: #ccc;
 }
 
 html body .normalize-text {
-  max-width: 64ch;
+  max-width: 78ch;
   --color-header: var(--context-text-color);
   --color-text: var(--context-text-color);
   color: var(--color-text);

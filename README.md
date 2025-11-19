@@ -2,16 +2,11 @@
 <br/>
 <br/>
 
-> Formerly Deepkit — renamed after European Union “no genuine use” ruling. Trademarks don't like open-source.
-
-<br/>
-<br/>
-
 <a href="https://discord.gg/U24mryk7Wq"><img alt="Discord" src="https://img.shields.io/discord/759513055117180999?style=square&label=Discord" /></a>
 <a href="https://www.npmjs.com/package/@deepkit/type"><img alt="npm" src="https://img.shields.io/npm/v/@deepkit/type.svg?style=square" /></a>
 [![CI](https://github.com/marcj/untitled-code/actions/workflows/main.yml/badge.svg)](https://github.com/marcj/untitled-code/actions/workflows/main.yml)
 
-This is a new modular TypeScript framework for backend applications based on runtime types.
+A modern, high-performance, and modular TypeScript framework for backend applications based on runtime types.
 
 ## Docs
 

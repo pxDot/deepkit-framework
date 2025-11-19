@@ -4,9 +4,9 @@ import { injectLocalStorageNumber, injectLocalStorageString } from '@app/app/uti
 
 @Injectable({ providedIn: 'root' })
 export class ContentTextService {
-    fontFamily = injectLocalStorageString('style/font-family', { defaultValue: '' });
-    fontSize = injectLocalStorageNumber('style/font-size', { defaultValue: 0 });
-    theme = injectLocalStorageString('style/theme', { defaultValue: '' });
+    fontFamily = injectLocalStorageString('style/font-family2', { defaultValue: 'sans-serif' });
+    fontSize = injectLocalStorageNumber('style/font-size2', { defaultValue: 0 });
+    theme = injectLocalStorageString('style/theme2', { defaultValue: 'dark' });
     darkMode = computed(() => this.theme() === 'dark');
 
     toc = injectLocalStorageString('style/toc', { defaultValue: '' });
@@ -66,6 +66,7 @@ export class ContentTextService {
       :host {
         display: block;
         margin: auto;
+        line-height: 1.75;
       }
 
       .style {
@@ -76,23 +77,23 @@ export class ContentTextService {
       }
 
       :host.font-size-very-small {
-        font-size: 0.8em;
+        font-size: 10px;
       }
 
       :host.font-size-small {
-        font-size: 0.9em;
+        font-size: 12px;
       }
 
       :host.font-size-normal {
-        font-size: 1em;
+        font-size: 14px;
       }
 
       :host.font-size-large {
-        font-size: 1.1em;
+        font-size: 16px;
       }
 
       :host.font-size-very-large {
-        font-size: 1.2em;
+        font-size: 18px;
       }
     `,
 })
